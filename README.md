@@ -20,7 +20,7 @@ A code editor (e.g., Android Stdio)
 **Getting Started**
 
 Clone the repository
-git clone https://github.com/MohammadAli007i/expense_tracker.git
+git clone (https://github.com/MohammadAli007i/Expense_App.git)
 cd expense_tracker
 Install dependencies
 
@@ -49,6 +49,7 @@ expense_tracker/
    |- main.dart         # Entry point of the app
 |- test/                # Unit and widget tests
 |- pubspec.yaml         # Project dependencies and configurations
+
 Database Setup
 The app uses a local SQLite database for storing expenses. No additional setup is required as the database is managed within the app.
 
