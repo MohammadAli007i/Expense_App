@@ -63,9 +63,11 @@ expense_tracker/
 # Project dependencies and configurations
 
 **Database Setup**:-
+
 The app uses a local SQLite database for storing expenses. No additional setup is required as the database is managed within the app.
 
 **Usage**:-
+
 Add Expense: Tap the floating action button (‘+’ icon), fill in the details, and tap "Add".
 Update Expense: Tap on an existing expense to edit, modify the fields, and tap "Update".
 Delete Expense: Swipe left on an expense item and tap the delete icon.
@@ -92,4 +94,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 **Acknowledgments**:-
 
 Flutter
+
 Dart
