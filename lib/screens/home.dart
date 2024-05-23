@@ -1,68 +1,28 @@
-import 'package:expenses/database/database_helper.dart';
-import 'package:expenses/model/expense_model.dart';
+import 'package:expenses/screens/expense_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:expenses/model/expense_model.dart';
 
-
-void main() {
-  runApp(MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Expenses',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
-      home: ExpenseListScreen(),
+class ExpenseListScreen extends StatelessWidget {
+  void _showNotificationDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('OK'),
+            ),
+          ],
+        );
+      },
     );
   }
-}
 
-class ExpenseListScreen extends StatefulWidget {
-  @override
-  _ExpenseListScreenState createState() => _ExpenseListScreenState();
-}
-
-class _ExpenseListScreenState extends State<ExpenseListScreen> {
-  late Future<List<Expense>> _expenseList;
-  DateTime? _startDate;
-  DateTime? _endDate;
-
-  @override
-  void initState() {
-    super.initState();
-    _updateExpenseList();
-  }
-
-  void _updateExpenseList() {
-    setState(() {
-      _expenseList = DatabaseHelper().getExpenses().then((expenses) {
-        expenses.sort((a, b) => a.date.compareTo(b.date));
-        return expenses;
-      });
-    });
-  }
-
-  void _filterExpensesByDate() {
-    setState(() {
-      _expenseList = DatabaseHelper().getExpenses().then((expenses) {
-        if (_startDate != null && _endDate != null) {
-          expenses = expenses.where((expense) {
-            return expense.date.isAfter(_startDate!.subtract(Duration(days: 1))) &&
-                expense.date.isBefore(_endDate!.add(Duration(days: 1)));
-          }).toList();
-        }
-        expenses.sort((a, b) => a.date.compareTo(b.date));
-        return expenses;
-      });
-    });
-  }
-
-  void _addOrUpdateExpense({Expense? expense}) async {
+  void _addOrUpdateExpense(BuildContext context, {Expense? expense}) async {
     final _formKey = GlobalKey<FormState>();
     String? amount = expense?.amount.toString();
     String? title = expense?.title;
@@ -176,23 +136,22 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                         ),
                         readOnly: true,
                         onTap: () async {
-                          DateTime initialDate = date ?? DateTime.now();
                           DateTime? pickedDate = await showDatePicker(
                             context: context,
-                            initialDate: initialDate,
+                            initialDate: date ?? DateTime.now(),
                             firstDate: DateTime(2000),
                             lastDate: DateTime(2101),
                           );
                           if (pickedDate != null) {
                             setModalState(() {
                               date = pickedDate;
-                              dateController.text = DateFormat('yyyy-MM-dd').format(date!);
+                              dateController.text = DateFormat('yyyy-MM-dd').format(pickedDate);
                             });
                           }
                         },
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please select a date';
+                            return 'Please pick a date';
                           }
                           return null;
                         },
@@ -204,28 +163,22 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                           ElevatedButton(
                             onPressed: () {
                               if (_formKey.currentState!.validate()) {
+                                final newExpense = Expense(
+                                  id: expense?.id,
+                                  title: title!,
+                                  amount: double.parse(amount!),
+                                  description: description!,
+                                  date: date!,
+                                );
+                                Provider.of<ExpenseProvider>(context, listen: false).addOrUpdateExpense(newExpense);
                                 Navigator.pop(context);
-                                if (amount != null && title != null && description != null && date != null) {
-                                  final newExpense = Expense(
-                                    id: expense?.id,
-                                    title: title!,
-                                    amount: double.parse(amount!),
-                                    description: description!,
-                                    date: date!,
-                                  );
-
-                                  if (expense == null) {
-                                    DatabaseHelper().insertExpense(newExpense);
-                                  } else {
-                                    DatabaseHelper().updateExpense(newExpense);
-                                  }
-
-                                  _updateExpenseList();
-                                }
+                                _showNotificationDialog(
+                                  context,
+                                  expense == null ? 'Expense added successfully' : 'Expense updated successfully',
+                                );
                               }
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blueAccent,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
@@ -243,8 +196,9 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                             ElevatedButton(
                               onPressed: () {
                                 Navigator.pop(context);
-                                _deleteExpense(expense.id!);
-                                _updateExpenseList();
+                                final expenseProvider = Provider.of<ExpenseProvider>(context, listen: false);
+                                expenseProvider.deleteExpense(expense.id!);
+                                _showNotificationDialog(context, 'Expense deleted successfully');
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.red,
@@ -274,10 +228,6 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     );
   }
 
-  void _deleteExpense(int id) async {
-    await DatabaseHelper().deleteExpense(id);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -298,89 +248,93 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                 firstDate: DateTime(2000),
                 lastDate: DateTime(2101),
                 initialDateRange: DateTimeRange(
-                  start: _startDate ?? DateTime.now().subtract(Duration(days: 7)),
-                  end: _endDate ?? DateTime.now(),
+                  start: DateTime.now().subtract(Duration(days: 7)),
+                  end: DateTime.now(),
                 ),
               );
               if (pickedDateRange != null) {
-                setState(() {
-                  _startDate = pickedDateRange.start;
-                  _endDate = pickedDateRange.end;
-                  _filterExpensesByDate();
-                });
+                Provider.of<ExpenseProvider>(context, listen: false).setDateRange(pickedDateRange);
               }
+            },
+          ),
+          IconButton(
+            icon: Icon(Icons.notifications),
+            onPressed: () {
+              final totalAllowance = Provider.of<ExpenseProvider>(context, listen: false).totalAllowance;
+              _showNotificationDialog(context, 'Total Allowance: \$${totalAllowance.toStringAsFixed(2)}');
             },
           ),
         ],
       ),
-      body: FutureBuilder(
-        future: _expenseList,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Text('Error: ${snapshot.error}');
-          } else if (snapshot.hasData) {
-            final expenses = snapshot.data as List<Expense>;
-            return ListView.builder(
-              itemCount: expenses.length,
-              itemBuilder: (context, index) {
-                final expense = expenses[index];
-                return Card(
-                  margin: EdgeInsets.all(8),
-                  child: InkWell(
-                    onTap: () {
-                      _addOrUpdateExpense(expense: expense);
-                    },
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: ListTile(
-                            title: Text(
-                              expense.title,
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            subtitle: Text(
-                              DateFormat('yyyy-MM-dd').format(expense.date),
-                            ),
-                            trailing: Text(
-                              '\r${expense.amount.toStringAsFixed(2)}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blueAccent,
+      body: Consumer<ExpenseProvider>(
+        builder: (context, expenseProvider, child) {
+          return FutureBuilder(
+            future: expenseProvider.expenseList,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Center(child: CircularProgressIndicator());
+              } else if (snapshot.hasError) {
+                return Text('Error: ${snapshot.error}');
+              } else if (snapshot.hasData) {
+                final expenses = snapshot.data as List<Expense>;
+                return ListView.builder(
+                  itemCount: expenses.length,
+                  itemBuilder: (context, index) {
+                    final expense = expenses[index];
+                    return Card(
+                      margin: EdgeInsets.all(8),
+                      child: InkWell(
+                        onTap: () {
+                          _addOrUpdateExpense(context, expense: expense);
+                        },
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: ListTile(
+                                title: Text(
+                                  expense.title,
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                subtitle: Text(
+                                  DateFormat('yyyy-MM-dd').format(expense.date),
+                                ),
+                                trailing: Text(
+                                  '\$${expense.amount.toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blueAccent,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                            IconButton(
+                              icon: Icon(Icons.edit),
+                              onPressed: () {
+                                _addOrUpdateExpense(context, expense: expense);
+                              },
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.delete),
+                              onPressed: () {
+                                Provider.of<ExpenseProvider>(context, listen: false).deleteExpense(expense.id!);
+                              },
+                            ),
+                          ],
                         ),
-                        IconButton(
-                          icon: Icon(Icons.edit),
-                          onPressed: () {
-                            _addOrUpdateExpense(expense: expense);
-                          },
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.delete),
-                          onPressed: () {
-                            if (expense.id != null) {
-                              _deleteExpense(expense.id!);
-                              _updateExpenseList();
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  },
                 );
-              },
-            );
-          } else {
-            return Center(child: Text('No expenses found'));
-          }
+              } else {
+                return Center(child: Text('No expenses found'));
+              }
+            },
+          );
         },
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          _addOrUpdateExpense();
+          _addOrUpdateExpense(context);
         },
         child: Icon(Icons.add),
         backgroundColor: Colors.blueAccent,

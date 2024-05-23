@@ -1,6 +1,7 @@
 import 'package:expenses/model/expense_model.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
   factory DatabaseHelper() => _instance;
@@ -24,10 +25,9 @@ class DatabaseHelper {
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    await db.execute('''
-      CREATE TABLE expenses ( id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, amount REAL , description TEXT , date DATE )''');
+    await db.execute(''' 
+         CREATE TABLE expenses ( id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT , amount REAL , description TEXT , date DATE )''');
   }
-
   Future<int> insertExpense(Expense expense) async {
     Database db = await database;
     return await db.insert('expenses', expense.toMap());
